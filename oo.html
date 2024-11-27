@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bluetooth Scanner</title>
+    <title>Bluetooth Device Scanner and Information</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,28 +33,65 @@
     </style>
 </head>
 <body>
-    <h1>Bluetooth Device Scanner</h1>
+    <h1>Bluetooth Device Information Scanner</h1>
     <button id="scan-button">Scan for Bluetooth Devices</button>
     <ul id="device-list"></ul>
+    <div id="device-info"></div>
 
     <script>
-        // Function to start scanning for Bluetooth devices
+        // Function to get the battery level of a Bluetooth device
+        async function getBatteryLevel(device) {
+            try {
+                const batteryService = await device.gatt.connect().then(server => server.getPrimaryService('battery_service'));
+                const batteryLevelCharacteristic = await batteryService.getCharacteristic('battery_level');
+                const batteryLevel = await batteryLevelCharacteristic.readValue();
+                return batteryLevel.getUint8(0); // Return battery level as a percentage
+            } catch (error) {
+                console.error('Error getting battery level:', error);
+                return 'N/A'; // Return 'N/A' if unable to retrieve battery level
+            }
+        }
+
+        // Function to get device information such as manufacturer name
+        async function getDeviceInformation(device) {
+            try {
+                const deviceInfoService = await device.gatt.connect().then(server => server.getPrimaryService('device_information'));
+                const manufacturerCharacteristic = await deviceInfoService.getCharacteristic('manufacturer_name');
+                const manufacturerName = await manufacturerCharacteristic.readValue();
+                return new TextDecoder().decode(manufacturerName); // Decode manufacturer name
+            } catch (error) {
+                console.error('Error getting device information:', error);
+                return 'N/A'; // Return 'N/A' if unable to retrieve device information
+            }
+        }
+
+        // Function to scan for Bluetooth devices and get information
         async function scanBluetoothDevices() {
             try {
                 const deviceList = document.getElementById('device-list');
                 deviceList.innerHTML = ''; // Clear previous list of devices
 
-                // Request Bluetooth device with "Scan for all devices" filter
+                // Request Bluetooth device with "Scan for all devices" filter and optional services
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: ['battery_service', 'device_information'] // Optional services you can request
+                    optionalServices: ['battery_service', 'device_information']
                 });
 
-                // Once device is selected, display its name and ID
+                // Once device is selected, retrieve information
+                const batteryLevel = await getBatteryLevel(device);
+                const manufacturerName = await getDeviceInformation(device);
+
+                // Display device information
                 const listItem = document.createElement('li');
                 listItem.textContent = `Device: ${device.name || 'Unknown'} (ID: ${device.id})`;
                 deviceList.appendChild(listItem);
 
+                const infoDiv = document.getElementById('device-info');
+                infoDiv.innerHTML = `
+                    <h3>Device Information</h3>
+                    <p><strong>Manufacturer:</strong> ${manufacturerName}</p>
+                    <p><strong>Battery Level:</strong> ${batteryLevel}%</p>
+                `;
                 console.log(`Selected device: ${device.name} with ID: ${device.id}`);
             } catch (error) {
                 console.log('Error scanning Bluetooth devices:', error);
